@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime
+import sqlite3
 
 extraction_url = 'https://web.archive.org/web/20230902185326/https://en.wikipedia.org/wiki/List_of_countries_by_GDP_%28nominal%29'
 table_attribs = ["Country", "GDP_USD_millions"]
@@ -58,10 +60,48 @@ def load_to_db(df, sql_connection, table_name):
 def run_query(query_statement, sql_connection):
     ''' This function runs the stated query on the database table and
     prints the output on the terminal. Function returns nothing. '''
+    data = pd.read_sql_query(query_statement, sql_connection)
+    print(data)
 
 
 def log_progress(message):
     ''' This function logs the mentioned message at a given stage of the code execution to a log file. Function returns nothing'''
+    timestamp_format = '%Y-%h-%d-%H:%M:%S'
+    now = datetime.now()
+    timestamp = now.strftime(timestamp_format)
+    with open("log.txt", "a") as f:
+        f.write(timestamp + ' - ' + message + '\n')
 
 
 
+log_progress('Preliminaries complete. Initiating ETL process.')
+
+df = extract(extraction_url,table_attribs)
+
+log_progress('Data extraction complete. Initiating Transformation process.')
+
+df = transform(df)
+
+log_progress('Data transformation complete. Initiating Loading process.')
+
+load_to_csv(df, csv_path)
+
+log_progress('Data saved to CSV file.')
+
+sql_connection = sqlite3.connect(db_name)
+
+log_progress('SQL Connection initiated.')
+
+load_to_db(df, sql_connection, table_name)
+
+log_progress('Data loaded to Database as table. Running the query.')
+
+query_statement = f"SELECT * FROM {table_name} WHERE GDP_USD_billions > 100"
+
+run_query(query_statement, sql_connection)
+
+log_progress('Query executed. Closing the SQL Connection.')
+
+sql_connection.close()
+
+log_progress('ETL process complete.')
